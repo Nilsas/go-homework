@@ -9,8 +9,9 @@ import (
 )
 
 type Request struct {
-	Host    string `json:"host"`
-	Samples int    `json:"samples"`
+	Host     string `json:"host"`
+	Samples  int    `json:"samples"`
+	Protocol string `json:"protocol"`
 }
 
 type Response struct {
@@ -22,6 +23,8 @@ type Response struct {
 func Handler(r Request) Response {
 	var resp Response
 	var samples int
+	var protocol string
+	var host string
 	// TODO: remove the below line as this only used for dev debug
 	startHandler := time.Now()
 
@@ -29,12 +32,26 @@ func Handler(r Request) Response {
 	// Make sure to timeout if the url is unresponsive
 	client := &http.Client{Timeout: time.Second * 5}
 
+	// If protocol is not provided assume http
+	if r.Protocol == "" {
+		protocol = "http"
+	} else {
+		protocol = r.Protocol
+	}
+
+	// Check if we have a host provided, fail if empty
+	if r.Host == "" {
+		log.Fatal("Expected host, got nothing: ", r.Host)
+	}
+
+	host = fmt.Sprintf("%s://%s", protocol, r.Host)
+
 	// Build new request
-	req, err := http.NewRequest("GET", r.Host, nil)
+	req, err := http.NewRequest("GET", host, nil)
 	if err != nil {
 		log.Fatal("Error creating new request. ", err)
 	}
-	resp.Host = req.Host
+	resp.Host = host
 
 	// If there are no samples provided or the number is less than 3
 	// we should assume that 3 samples are a minimum, otherwise set
@@ -84,7 +101,7 @@ func Handler(r Request) Response {
 }
 
 func main() {
-	req := Request{Host: "https://vagiu.lt/", Samples: 10}
+	req := Request{Host: "vagiu.lt", Samples: 10, Protocol: "https"}
 	res := Handler(req)
 	fmt.Println(res)
 }
