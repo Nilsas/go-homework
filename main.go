@@ -22,6 +22,7 @@ type Response struct {
 func Handler(r Request) Response {
 	var resp Response
 	var samples int
+	// TODO: remove the below line as this only used for dev debug
 	startHandler := time.Now()
 
 	// Create HTTP Client for interaction with the Web
@@ -31,7 +32,7 @@ func Handler(r Request) Response {
 	// Build new request
 	req, err := http.NewRequest("GET", r.Host, nil)
 	if err != nil {
-		panic(err)
+		log.Fatal("Error creating new request. ", err)
 	}
 	resp.Host = req.Host
 
@@ -48,6 +49,7 @@ func Handler(r Request) Response {
 	wg := &sync.WaitGroup{}
 	c1 := make(chan int64)
 
+	// Do a go routine for each sample we need to do
 	for i := 1; i <= samples; i++ {
 		wg.Add(1)
 		go func() {
@@ -69,14 +71,19 @@ func Handler(r Request) Response {
 
 		resp.Results = append(resp.Results, fmt.Sprintf("%dms", elapsed))
 	}
+	// Wait for all routines to finish
 	wg.Wait()
+
+	// TODO: remove below expression as this is only used for dev debug
+	// Print total elapsed time
 	elapsedHandler := time.Since(startHandler).Milliseconds()
 	fmt.Println(elapsedHandler)
+
+	// return the response that we built
 	return resp
 }
 
 func main() {
-
 	req := Request{Host: "https://vagiu.lt/", Samples: 10}
 	res := Handler(req)
 	fmt.Println(res)
