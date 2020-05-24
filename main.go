@@ -9,14 +9,14 @@ import (
 )
 
 type Request struct {
-	host string
-	samples int
+	Host    string `json:"host"`
+	Samples int    `json:"samples"`
 }
 
 type Response struct {
-	host string `json:"host"`
-	protocol string `json:"protocol"`
-	results []string `json:"results"`
+	Host     string   `json:"host"`
+	Protocol string   `json:"protocol"`
+	Results  []string `json:"results"`
 }
 
 func Handler(r Request) Response {
@@ -24,24 +24,24 @@ func Handler(r Request) Response {
 	var samples int
 	startHandler := time.Now()
 
-
 	// Create HTTP Client for interaction with the Web
 	// Make sure to timeout if the url is unresponsive
 	client := &http.Client{Timeout: time.Second * 5}
 
 	// Build new request
-	req, err := http.NewRequest("GET", r.host, nil)
+	req, err := http.NewRequest("GET", r.Host, nil)
 	if err != nil {
 		panic(err)
 	}
+	resp.Host = req.Host
 
 	// If there are no samples provided or the number is less than 3
 	// we should assume that 3 samples are a minimum, otherwise set
 	// sample to the requested value
-	if r.samples < 3 {
+	if r.Samples < 3 {
 		samples = 3
 	} else {
-		samples = r.samples
+		samples = r.Samples
 	}
 
 	// Create Wait Group and channel to use go routines
@@ -67,7 +67,7 @@ func Handler(r Request) Response {
 		// read to retrieve results from channel
 		elapsed := <-c1
 
-		resp.results = append(resp.results, fmt.Sprintf("%dms", elapsed))
+		resp.Results = append(resp.Results, fmt.Sprintf("%dms", elapsed))
 	}
 	wg.Wait()
 	elapsedHandler := time.Since(startHandler).Milliseconds()
@@ -77,7 +77,7 @@ func Handler(r Request) Response {
 
 func main() {
 
-    req := Request{host: "https://vagiu.lt/", samples: 10}
+	req := Request{Host: "https://vagiu.lt/", Samples: 10}
 	res := Handler(req)
 	fmt.Println(res)
 }
