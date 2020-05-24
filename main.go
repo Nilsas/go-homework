@@ -21,7 +21,7 @@ type Response struct {
 }
 
 func Handler(r Request) Response {
-	var resp Response
+	var rez Response
 	var samples int
 	var protocol string
 	var host string
@@ -39,20 +39,6 @@ func Handler(r Request) Response {
 		protocol = r.Protocol
 	}
 
-	// Check if we have a host provided, fail if empty
-	if r.Host == "" {
-		log.Fatal("Expected host, got nothing: ", r.Host)
-	}
-
-	host = fmt.Sprintf("%s://%s", protocol, r.Host)
-
-	// Build new request
-	req, err := http.NewRequest("GET", host, nil)
-	if err != nil {
-		log.Fatal("Error creating new request. ", err)
-	}
-	resp.Host = host
-
 	// If there are no samples provided or the number is less than 3
 	// we should assume that 3 samples are a minimum, otherwise set
 	// sample to the requested value
@@ -62,6 +48,23 @@ func Handler(r Request) Response {
 		samples = r.Samples
 	}
 
+	// Check if we have a host provided, fail if empty
+	if r.Host == "" {
+		log.Fatal("Expected host, got nothing: ", r.Host)
+	}
+
+	// format request host to the correct format
+	// set response values
+	host = fmt.Sprintf("%s://%s", protocol, r.Host)
+	rez.Host = host
+	rez.Protocol = protocol
+
+	// Build new request
+	req, err := http.NewRequest("GET", host, nil)
+	if err != nil {
+		log.Fatal("Error creating new request. ", err)
+	}
+
 	// Create Wait Group and channel to use go routines
 	wg := &sync.WaitGroup{}
 	c1 := make(chan int64)
@@ -69,39 +72,44 @@ func Handler(r Request) Response {
 	// Do a go routine for each sample we need to do
 	for i := 1; i <= samples; i++ {
 		wg.Add(1)
-		go func() {
+		go func(wg *sync.WaitGroup, id int) {
 			defer wg.Done()
+			fmt.Printf("Worked with id %v has started\n", id)
 			// Start the stop watch and initiate the request
 			start := time.Now()
-			resp, err := client.Do(req)
+			_, err := client.Do(req)
 			if err != nil {
 				log.Fatal("Error reading response. ", err)
 			}
-			defer resp.Body.Close()
 			// Stop the stopwatch and print out the result
 			elapsed := time.Since(start).Milliseconds()
 			// This writes to channel
 			c1 <- elapsed
-		}()
+			fmt.Printf("Worked with id %v has finished\n", id)
+		}(wg, i)
+		// Seems that main thread needs to sleep in order for concurrency to work
+		//time.Sleep(200 * time.Millisecond)
 		// read to retrieve results from channel
 		elapsed := <-c1
-
-		resp.Results = append(resp.Results, fmt.Sprintf("%dms", elapsed))
+		rez.Results = append(rez.Results, fmt.Sprintf("%dms", elapsed))
 	}
 	// Wait for all routines to finish
 	wg.Wait()
+	// Close channel
+	close(c1)
 
 	// TODO: remove below expression as this is only used for dev debug
 	// Print total elapsed time
 	elapsedHandler := time.Since(startHandler).Milliseconds()
-	fmt.Println(elapsedHandler)
+	fmt.Printf("Total time elapsed %v\n", elapsedHandler)
 
 	// return the response that we built
-	return resp
+	return rez
 }
 
 func main() {
 	req := Request{Host: "vagiu.lt", Samples: 10, Protocol: "https"}
 	res := Handler(req)
+
 	fmt.Println(res)
 }
