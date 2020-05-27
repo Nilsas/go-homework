@@ -69,9 +69,7 @@ func Handler(r Request) Response {
 	wg := &sync.WaitGroup{}
 	c1 := make(chan int64)
 
-	wg.Add(1)
 	go func(){
-		defer wg.Done()
 		for result := range c1 {
 			fmt.Printf("Saving result: %d\n", result)
 			rez.Results = append(rez.Results, fmt.Sprintf("%dms", result))
