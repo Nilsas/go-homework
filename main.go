@@ -69,6 +69,15 @@ func Handler(r Request) Response {
 	wg := &sync.WaitGroup{}
 	c1 := make(chan int64)
 
+	wg.Add(1)
+	go func(){
+		defer wg.Done()
+		for result := range c1 {
+			fmt.Printf("Saving result: %d\n", result)
+			rez.Results = append(rez.Results, fmt.Sprintf("%dms", result))
+		}
+	}()
+
 	// Do a go routine for each sample we need to do
 	for i := 1; i <= samples; i++ {
 		wg.Add(1)
@@ -87,16 +96,18 @@ func Handler(r Request) Response {
 			c1 <- elapsed
 			fmt.Printf("Worked with id %v has finished\n", id)
 		}(wg, i)
-		// Seems that main thread needs to sleep in order for concurrency to work
-		//time.Sleep(200 * time.Millisecond)
+
 		// read to retrieve results from channel
-		elapsed := <-c1
-		rez.Results = append(rez.Results, fmt.Sprintf("%dms", elapsed))
+		//elapsed := <-c1
+
 	}
+
 	// Wait for all routines to finish
 	wg.Wait()
+
 	// Close channel
 	close(c1)
+
 
 	// TODO: remove below expression as this is only used for dev debug
 	// Print total elapsed time
