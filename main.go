@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 )
+
 //"github.com/aws/aws-lambda-go/lambda"
 type Request struct {
 	Host     string `json:"host"`
@@ -27,29 +28,27 @@ func Handler(request []byte) []byte {
 	var protocol string
 	var host string
 
-
 	var r Request
-	err := json.Unmarshal([]byte(request), &r)
-
-	// TODO: remove the below line as this only used for dev debug
-	startHandler := time.Now()
+	err := json.Unmarshal(request, &r)
 
 	// Create HTTP Client for interaction with the Web
 	// Make sure to timeout if the url is unresponsive
 	client := &http.Client{Timeout: time.Second * 5}
 
 	// If protocol is not provided assume http
+	// Guard from random protocol requests
 	if r.Protocol == "" {
 		protocol = "http"
 	} else {
-		protocol = r.Protocol
+		if r.Protocol == "https" || r.Protocol == "http" {
+			protocol = r.Protocol
+		} else {
+			log.Fatal("Only HTTP and HTTPS allowed")
+		}
 	}
 
-	// If there are no samples provided or the number is less than 3
-	// we should assume that 3 samples are a minimum, otherwise set
-	// sample to the requested value
-	// TODO: consider eval to null
-	if r.Samples < 3 {
+	// We should assume that 3 samples are a sane default
+	if r.Samples == 0 {
 		samples = 3
 	} else {
 		samples = r.Samples
@@ -76,7 +75,7 @@ func Handler(request []byte) []byte {
 	wg := &sync.WaitGroup{}
 	c1 := make(chan int64)
 
-	go func(){
+	go func() {
 		for result := range c1 {
 			fmt.Printf("Saving result: %d\n", result)
 			rez.Results = append(rez.Results, fmt.Sprintf("%dms", result))
@@ -101,10 +100,6 @@ func Handler(request []byte) []byte {
 			c1 <- elapsed
 			fmt.Printf("Worked with id %v has finished\n", id)
 		}(wg, i)
-
-		// read to retrieve results from channel
-		//elapsed := <-c1
-
 	}
 
 	// Wait for all routines to finish
@@ -113,20 +108,18 @@ func Handler(request []byte) []byte {
 	// Close channel
 	close(c1)
 
+	// Sometimes it is too fast thus if the array is incomplete we sleep for a bit
+	if len(rez.Results) < samples {
+		time.Sleep(time.Microsecond * 30)
+	}
 
-	// TODO: remove below expression as this is only used for dev debug
-	// Print total elapsed time
-	elapsedHandler := time.Since(startHandler).Milliseconds()
-	fmt.Printf("Total time elapsed %v\n", elapsedHandler)
-
-	// json encode our response
+	// json encode and return response
 	jsonResponse, err := json.Marshal(rez)
-	// return the response that we built
 	return jsonResponse
 }
 
 func main() {
-	req := Request{Host: "vagiu.lt", Samples: 10, Protocol: "https"}
+	req := Request{Host: "vagiu.lt", Samples: 4, Protocol: "https"}
 	request, _ := json.Marshal(req)
 	res := Handler(request)
 	//lambda.Start(Handler)
