@@ -1,13 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 )
-
+//"github.com/aws/aws-lambda-go/lambda"
 type Request struct {
 	Host     string `json:"host"`
 	Samples  int    `json:"samples"`
@@ -20,11 +21,16 @@ type Response struct {
 	Results  []string `json:"results"`
 }
 
-func Handler(r Request) Response {
+func Handler(request []byte) []byte {
 	var rez Response
 	var samples int
 	var protocol string
 	var host string
+
+
+	var r Request
+	err := json.Unmarshal([]byte(request), &r)
+
 	// TODO: remove the below line as this only used for dev debug
 	startHandler := time.Now()
 
@@ -42,6 +48,7 @@ func Handler(r Request) Response {
 	// If there are no samples provided or the number is less than 3
 	// we should assume that 3 samples are a minimum, otherwise set
 	// sample to the requested value
+	// TODO: consider eval to null
 	if r.Samples < 3 {
 		samples = 3
 	} else {
@@ -112,13 +119,16 @@ func Handler(r Request) Response {
 	elapsedHandler := time.Since(startHandler).Milliseconds()
 	fmt.Printf("Total time elapsed %v\n", elapsedHandler)
 
+	// json encode our response
+	jsonResponse, err := json.Marshal(rez)
 	// return the response that we built
-	return rez
+	return jsonResponse
 }
 
 func main() {
 	req := Request{Host: "vagiu.lt", Samples: 10, Protocol: "https"}
-	res := Handler(req)
-
-	fmt.Println(res)
+	request, _ := json.Marshal(req)
+	res := Handler(request)
+	//lambda.Start(Handler)
+	fmt.Println(string(res))
 }
